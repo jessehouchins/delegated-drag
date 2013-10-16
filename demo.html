@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="demo.css" />
+    <script type="text/javascript" src="lib/jquery.js"></script>
+    <script type="text/javascript" src="lib/underscore.js"></script>
+    <script type="text/javascript" src="delegatedDragDrop.js"></script>
+  </head>
+  <body>
+    <div id="base"></div>
+    <script type="text/javascript">
+      $('#base').dragDrop({
+        scope: 'colors',
+        sortable: '.color',
+        droppable: '.colorGroup'
+      })
+
+      // now lets add some stuff!
+      var html = ''
+      var count = 1
+      function list(){ return '<ul class="colorGroup"><li class="color">Item '+(count++)+'</li><li class="color">Item '+(count++)+'</li><li class="color">Item '+(count++)+'</li></ul>' }
+      while (count <= 5) {
+        $('#base').append(list())
+      }
+    </script>
+  </body>
+</html>
