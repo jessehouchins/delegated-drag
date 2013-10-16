@@ -27,6 +27,10 @@ li {
   padding: .3em .5em;
 }
 
-.draggable {
+.color {
   cursor: move;
+}
+
+.ddd-over {
+  border-color: red;
 }

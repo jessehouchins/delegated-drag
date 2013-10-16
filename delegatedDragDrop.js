@@ -5,8 +5,9 @@
   // `defaults` -- Combined with options on instance initialization.
 
   var defaults = {
-    scope:      '_',
-    tolerance:  5
+    scope: '_',
+    tolerance: 5,
+    overClass: 'ddd-over'
   }
 
   // `$.fn.dragDrop` -- Initializes one-time event bindings on selected base element.
@@ -73,54 +74,79 @@
     // `move` -- Checks to see it the mouse is over a droppable.
 
     move: function(e) {
-      this.position(e)
       this.updateDroppable(e)
-    },
-
-    // `over` -- Handles sort display if sortable is active.
-    
-    over: function(e) {
-
-    },
-
-    // `out` -- Handles sort display if sortable is active. 
-
-    out: function(e) {
-
+      this.updateDraggable(e)
     },
 
     // `end` -- Cleans up move events and runs drop callbacks if necessary.
 
     end: function(e) {
-      // clean up move events
-      this.doc.off('.' + this.uid)
+      this.doc.off('.' + this.uid) // clean up move events
       this.releaseDraggableEl()
-      //
-      doAction.call(this, 'drag:drop', e)
+      if (this.droppableEl) doAction.call(this, 'drag:drop', e)
     },
 
-    // `position` -- Updates the position of the draggable element/placeholder.
+    drop: function() {
+      $(this.droppableEl).removeClass(this.opts.overClass)
+    },
 
-    position: function(e) {
-      this.draggableEl(e).offset({
+    // `updateDraggable` -- Updates the position and dom parent of the draggable element/placeholder.
+
+    updateDraggable: function(e) {
+      // check for sortables
+      var nextSortable
+      var sortableEl
+      var sortableEls = this.sortableEls().get().slice(0)
+      var draggableEl = this.draggableEl(e)
+
+      // findt the draggable sort position
+      while (!nextSortable && sortableEls.length) {
+        sortableEl = sortableEls.shift()
+        if (relativePosition(sortableEl, e).above) nextSortable = sortableEl
+      }
+
+      // move the draggable if necessary
+      if (nextSortable) $(nextSortable).before(draggableEl)
+      else if (sortableEl) $(sortableEl).after(draggableEl)
+      else if (this.droppableEl) $(this.droppableEl).append(draggableEl)
+
+      // update the draggable position
+      draggableEl.offset({
         top: e.pageY - (this.opts.offsetY || this.offsetY),
         left: e.pageX - (this.opts.offsetX || this.offsetX)
       })
     },
 
+    // `updateDroppable` -- Updates droppable class on psuedo mouseover/mouseout events.
+
+    updateDroppable: function(e) {
+      var wasOver = this.droppableEl
+      var isOver
+      var droppableEls = this.droppableEls().get().slice(0)
+
+      while (!isOver && droppableEls.length) {
+        var droppableEl = droppableEls.shift()
+        if (relativePosition(droppableEl, e).over) isOver = droppableEl
+      }
+
+      this.droppableEl = isOver
+
+      if (wasOver !== isOver) {
+        delete this._sortableEls
+        if (wasOver) $(wasOver).removeClass(this.opts.overClass)
+        if (isOver) $(isOver).addClass(this.opts.overClass)
+      }
+    },
+
     // `draggableEl` -- Returns a reference to the draggable element or placeholder.
 
     draggableEl: function(e) {
-      if (!this._draggableEl) this.findDraggableEl()
-      return this._draggableEl
-    },
+      if (this._draggableEl) return this._draggableEl
 
-    findDraggableEl: function() {
       var opts = this.opts
-      if (opts.placeholder) {
-        this._draggableEl = $(_.result(opts, 'placeholder')).append('body')
-      }
-      else {
+
+      // either move the original element
+      if (!opts.placeholder) {
         var el = $(this.el)
         if (el.is(opts.handle)) {
           if (opts.draggable) el = el.closest(opts.draggable)
@@ -136,45 +162,37 @@
 
         raw.style.zIndex = 9999
 
-        this._draggableEl = el
+        return this._draggableEl = el
       }
+
+      // or use a drag placeholder
+      return this._draggableEl = $(_.result(opts, 'placeholder')).append('body')
     },
 
     releaseDraggableEl: function() {
       var el = this.draggableEl()
-      if (this.opts.placeholder) {
-        el.remove()
-      }
-      else {
-        var raw = el.get()[0]
-        var oldStyle = el.data('oldStyle')
-        raw.style.top = oldStyle.top
-        raw.style.left = oldStyle.left
-        raw.style.zIndex = oldStyle.zIndex
-      }
-    },
 
-    updateDroppable: function(e) {
-      var wasOver = this.droppable
-      var isOver
-      var droppables = this.droppableEls().get().slice(0)
+      if (this.opts.placeholder) return el.remove()
 
-      while (!isOver && droppables.length) {
-        var droppable = droppables.shift()
-        if (checkOver(droppable, e)) isOver = droppable
-      }
-
-      this.droppable = isOver
-
-      if (wasOver !== isOver) {
-        if (wasOver) wasOver.style.borderStyle = 'solid'
-        if (isOver) isOver.style.borderStyle = 'dashed'
-      }
+      var raw = el.get()[0]
+      var oldStyle = el.data('oldStyle')
+      raw.style.top = oldStyle.top
+      raw.style.left = oldStyle.left
+      raw.style.zIndex = oldStyle.zIndex
     },
 
     droppableEls: function() {
       if (!this._droppableEls) this._droppableEls = $(this.opts.droppable)
       return this._droppableEls
+    },
+
+    sortableEls: function() {
+      if (!this.droppableEl) return $()
+      if (!this._sortableEls) {
+        this._sortableEls = $(this.droppableEl).find(this.opts.sortable)
+        console.log("sortable", this._sortableEls.text())
+      }
+      return this._sortableEls
     },
 
     // `trigger` -- fires DOM events on the document (override if you want).
@@ -189,12 +207,16 @@
 
   // `checkOver` - Checks if the mouse is over the given element
 
-  function checkOver(el, e) {
+  function relativePosition(el, e) {
     el = $(el)
     var offset = el.offset()
-    offset.right = offset.left + el.outerWidth()
-    offset.bottom = offset.top + el.outerHeight()
-    return e.pageX >= offset.left && e.pageX <= offset.right && e.pageY >= offset.top && e.pageY <= offset.bottom
+    var width = el.outerWidth()
+    var height = el.outerHeight()
+
+    return {
+      over: e.pageX >= offset.left && e.pageX <= offset.left + width && e.pageY >= offset.top && e.pageY <= offset.top + height,
+      above: e.pageY < offset.top + height/2
+    }
   }
 
   // `doAction` - Fires methods/callbacks and scoped events for each action.
