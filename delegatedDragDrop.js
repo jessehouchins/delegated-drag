@@ -2,53 +2,59 @@
 
   // SETUP ----------------------------------------
 
-  // `defaults` -- Combined with options on instance initialization.
-
+  var uidcount = 1
+  var doc = $(document)
   var defaults = {
     scope: '_',
     tolerance: 5,
-    overClass: 'ddd-over'
+    overClass: 'dragDrop-over'
   }
 
-  // `uidCount` == A simple uid counter.
 
-  var uidcount = 1
+  // GLOBAL EVENT MODULE -------------------------------
+
+  function createDragDrop(e) {
+    var base = $(e.currentTarget)
+    base.data('dragDrop', new DragDrop(e, base.data('dragDrop-opts')))
+  }
+
 
   // `$.fn.dragDrop` -- Initializes one-time event bindings on the document.
 
   $.fn.dragDrop = function(opts) {
     if (!opts || !opts.sortable && !opts.draggable && !opts.droppable) return
 
-    opts = DragDrop.prototype.defaults({base: this}, opts, defaults)
-
+    var base = this
     var selectors = []
     var handle = opts.handle ? ' ' + opts.handle : ''
 
     if (opts.sortable) selectors.push(opts.sortable + handle)
     if (opts.draggable) selectors.push(opts.draggable + handle)
 
-    $(document).on('mousedown.DragDrop', selectors.join(', '), function(e) { new DragDrop(e, opts) })
+    base
+      .data('dragDrop-opts', DragDrop.prototype.defaults({base: base, selector: selectors.join(', ')}, opts, defaults))
+      .on('mousedown.dragDrop', createDragDrop)
   }
+
+  $.fn.dragDrop.module = DragDrop
 
 
   // MODULE CONSTRUCTOR --------------------------------
 
   function DragDrop(e, opts) {
-    this.opts = opts
-    this.el = e.currentTarget
+    this.opts = opts || {}
+    this.el = $(e.target).closest(opts.selector)
     this.startX = e.pageX
     this.startY = e.pageY
     this.offsetX = e.offsetX
     this.offsetY = e.offsetY
-
-    var uid = this.uid = this.newUid()
-    var doc = this.doc = $(document)
+    this.uid = this.newUid()
 
     // start watch event
-    doc.on('mousemove.' + uid, this.defer('watch'))
+    doc.on('mousemove.' + this.uid, this.defer('watch'))
 
     // stop events if drag never starts
-    doc.on('mouseup.' + this.uid, function(){ doc.off('.' + uid) })
+    doc.on('mouseup.' + this.uid, function(){ doc.off('.' + this.uid) })
   }
 
   DragDrop.prototype = {
@@ -59,7 +65,7 @@
     watch: function(e) {
       if (Math.abs(this.startX - e.pageX) > this.opts.tolerance || Math.abs(this.startY - e.pageY) > this.opts.tolerance) {
         // stop watch event
-        this.doc.off('.' + this.uid)
+        doc.off('.' + this.uid)
         // start drag events
         this.doAction('drag:start', e)
       }
@@ -70,8 +76,8 @@
     start: function(e) {
       // start move events
       this.started = true
-      this.doc.on('mousemove.' + this.uid, this.defer('doAction', 'drag:move'))
-      this.doc.on('mouseup.' + this.uid, this.defer('doAction', 'drag:end'))
+      doc.on('mousemove.' + this.uid, this.defer('doAction', 'drag:move'))
+      doc.on('mouseup.' + this.uid, this.defer('doAction', 'drag:end'))
 
       // do initial move
       this.move(e)
@@ -87,7 +93,7 @@
     // `end` -- Cleans up move events and runs drop callbacks if necessary.
 
     end: function(e) {
-      this.doc.off('.' + this.uid) // clean up move events
+      doc.off('.' + this.uid) // clean up move events
       this.releaseDraggableEl()
       if (this.droppableEl) this.doAction('drag:drop', e)
     },
@@ -108,7 +114,7 @@
 
       // either move the original element
       if (!opts.placeholder) {
-        var el = $(this.el)
+        var el = this.el
         if (el.is(opts.handle)) {
           if (opts.draggable) el = el.closest(opts.draggable)
           if (opts.sortable) el = el.closest(opts.sortable)
@@ -209,7 +215,7 @@
     // `trigger` -- fires DOM events on the document (override if you want).
 
     trigger: function(type, clonedEvent) {
-      this.doc.trigger(type, clonedEvent, this)
+      doc.trigger(type, clonedEvent, this)
     },
 
     // `relativePosition` - Checks where the mouse is relative to the given element.
@@ -231,7 +237,7 @@
     doAction: function(type, e) {
       opts = this.opts
       var method = type.split(':')[1]
-      if (opts.scope) type += ':' + opts.scope
+      if (opts.scope !== defaults.scope) type += ':' + opts.scope
       if (this[method]) this[method](e)
       var clonedEvent = new $.Event(type, this.pick(e, 'pageX', 'pageY', 'target', 'currentTarget', 'originalEvent'))
       this.trigger(type, clonedEvent)

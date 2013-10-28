@@ -1,14 +1,24 @@
+(function(root){
 
-module('Setup')
+  var con = $.fn.dragDrop.module
+  var proto = con.prototype
 
-  test("$.fn.dragDrop exists", 1, function() {
-    ok(typeof $.fn.dragDrop === 'function')
-  })
+  root.DragDrop = {
+    proto: proto,
+    mockInstance: function(e, opts) {
+      var mock = {}
 
-  test("Constructor", 1, function() {
-    ok(true)
-  })
+      // generate spy methods
+      for (var i in proto) {
+        if (typeof proto[i] === 'function') {
+          mock[i] = sinon.spy()
+        }
+      }
 
-  test("binds to default scope", 1, function() {
-    ok(true)
-  })
+      // call constructor with mock scope
+      con.call(mock, e || {}, opts)
+      return mock
+    }
+  }
+
+})(this)
