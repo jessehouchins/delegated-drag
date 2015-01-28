@@ -2,7 +2,7 @@ delegated-drag
 ==============
 
 # Notice:
-This is still under active development. The features below may or may not be implemented yet.
+This is NOT under active development. The many of the features below are not be implemented yet.
 
 # Intro
 
